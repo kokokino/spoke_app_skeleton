@@ -1,0 +1,121 @@
+import { Meteor } from 'meteor/meteor';
+import { checkSubscriptionWithHub } from './client.js';
+
+// Cache subscription checks for a short period
+const subscriptionCache = new Map();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Check if a user has the required subscriptions
+ * @param {string} meteorUserId - The local Meteor user ID
+ * @param {string[]} requiredProductIds - Array of required product IDs
+ * @returns {boolean} - Whether the user has access
+ */
+export async function checkSubscription(meteorUserId, requiredProductIds = []) {
+  // If no products required, always grant access
+  if (!requiredProductIds || requiredProductIds.length === 0) {
+    return true;
+  }
+  
+  // Get user's subscription data
+  const user = await Meteor.users.findOneAsync(meteorUserId);
+  if (!user) {
+    return false;
+  }
+  
+  const subscriptions = user.profile?.subscriptions || [];
+  const hubUserId = user.services?.sso?.hubUserId;
+  
+  // Check local subscription data first
+  const hasLocalAccess = checkLocalSubscriptions(subscriptions, requiredProductIds);
+  
+  if (hasLocalAccess) {
+    return true;
+  }
+  
+  // If no local access, try to refresh from Hub
+  if (hubUserId) {
+    try {
+      const freshData = await refreshSubscriptionFromHub(meteorUserId, hubUserId, requiredProductIds);
+      return freshData.hasAccess;
+    } catch (error) {
+      console.error('Failed to refresh subscription from Hub:', error);
+      // Fall back to local data
+      return hasLocalAccess;
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Check subscriptions against local cached data
+ */
+function checkLocalSubscriptions(subscriptions, requiredProductIds) {
+  if (!subscriptions || subscriptions.length === 0) {
+    return false;
+  }
+  
+  const now = new Date();
+  
+  // Check if user has any of the required products with active status
+  return requiredProductIds.some(requiredId => {
+    return subscriptions.some(sub => {
+      if (sub.productId !== requiredId) return false;
+      if (sub.status !== 'active') return false;
+      if (sub.validUntil && new Date(sub.validUntil) < now) return false;
+      return true;
+    });
+  });
+}
+
+/**
+ * Refresh subscription data from Hub API
+ */
+async function refreshSubscriptionFromHub(meteorUserId, hubUserId, requiredProductIds) {
+  // Check cache first
+  const cacheKey = `${hubUserId}:${requiredProductIds.join(',')}`;
+  const cached = subscriptionCache.get(cacheKey);
+  
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.data;
+  }
+  
+  // Call Hub API
+  const result = await checkSubscriptionWithHub(hubUserId, requiredProductIds);
+  
+  // Update local user data
+  if (result.subscriptions) {
+    await Meteor.users.updateAsync(meteorUserId, {
+      $set: {
+        'profile.subscriptions': result.subscriptions
+      }
+    });
+  }
+  
+  // Cache the result
+  subscriptionCache.set(cacheKey, {
+    timestamp: Date.now(),
+    data: result
+  });
+  
+  return result;
+}
+
+/**
+ * Clear subscription cache for a user
+ */
+export function clearSubscriptionCache(hubUserId) {
+  for (const key of subscriptionCache.keys()) {
+    if (key.startsWith(hubUserId + ':')) {
+      subscriptionCache.delete(key);
+    }
+  }
+}
+
+/**
+ * Get required products from settings
+ */
+export function getRequiredProducts() {
+  return Meteor.settings.public?.requiredProducts || [];
+}
