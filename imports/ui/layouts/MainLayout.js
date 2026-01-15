@@ -18,7 +18,7 @@ export const MainLayout = {
             m('span', 'Loading...') :
           user ? [
             m('span.username', user.username || 'User'),
-            m('a', { href: hubUrl, target: '_blank' }, 'Hub'),
+            m('a', { href: hubUrl }, 'Hub'),
             m('button.outline.secondary', {
               onclick() {
                 Meteor.logout(() => {
@@ -39,9 +39,9 @@ export const MainLayout = {
       m('footer.container', [
         m('small', [
           'Powered by ',
-          m('a', { href: hubUrl, target: '_blank' }, 'Kokokino'),
+          m('a', { href: hubUrl }, 'Kokokino'),
           ' • ',
-          m('a', { href: hubUrl, target: '_blank' }, 'Return to Hub')
+          m('a', { href: hubUrl }, 'Return to Hub')
         ])
       ])
     ]);
