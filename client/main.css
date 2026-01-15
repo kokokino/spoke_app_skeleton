@@ -101,7 +101,8 @@ footer {
   background: #2e7d32;
   color: #ffffff;
   border-radius: var(--pico-border-radius);
-  max-width: 80%;
+  max-width: 90%;
+  align-self: flex-start;
 }
 
 .chat-message.own-message {
