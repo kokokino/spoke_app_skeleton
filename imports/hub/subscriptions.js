@@ -23,7 +23,7 @@ export async function checkSubscription(meteorUserId, requiredProductIds = []) {
     return false;
   }
   
-  const subscriptions = user.profile?.subscriptions || [];
+  const subscriptions = user.subscriptions || [];
   const hubUserId = user.services?.sso?.hubUserId;
   
   // Check local subscription data first
@@ -88,7 +88,7 @@ async function refreshSubscriptionFromHub(meteorUserId, hubUserId, requiredProdu
   if (result.subscriptions) {
     await Meteor.users.updateAsync(meteorUserId, {
       $set: {
-        'profile.subscriptions': result.subscriptions
+        subscriptions: result.subscriptions
       }
     });
   }

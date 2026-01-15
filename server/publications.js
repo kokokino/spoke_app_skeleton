@@ -43,7 +43,7 @@ Meteor.publish('userData', function() {
       fields: { 
         username: 1,
         emails: 1,
-        'profile.subscriptions': 1,
+        subscriptions: 1,
         'services.sso.hubUserId': 1
       } 
     }

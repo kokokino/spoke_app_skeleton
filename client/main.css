@@ -6,6 +6,12 @@ html, body {
   margin: 0;
 }
 
+:root {
+  --primary: #4a6fa5;
+  --secondary: #166088;
+  font-size: 16px; /*reduce font size somewhat*/
+}
+
 #app {
   min-height: 100%;
   display: flex;

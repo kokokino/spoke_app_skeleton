@@ -24,21 +24,18 @@ Accounts.registerLoginHandler('sso', async function(options) {
   let user = await Meteor.users.findOneAsync({ 'services.sso.hubUserId': userId });
   
   if (!user) {
-    // Create new user
-    const newUserId = await Accounts.createUserAsync({
+    // Create new user directly in the users collection
+    const newUserId = await Meteor.users.insertAsync({
       username: username,
-      email: email
-    });
-    
-    // Add SSO service data
-    await Meteor.users.updateAsync(newUserId, {
-      $set: {
-        'services.sso': {
+      emails: email ? [{ address: email, verified: true }] : [],
+      services: {
+        sso: {
           hubUserId: userId,
           lastLogin: new Date()
-        },
-        'profile.subscriptions': subscriptions
-      }
+        }
+      },
+      subscriptions: subscriptions,
+      createdAt: new Date()
     });
     
     user = await Meteor.users.findOneAsync(newUserId);
@@ -49,7 +46,7 @@ Accounts.registerLoginHandler('sso', async function(options) {
         username: username,
         'emails.0.address': email,
         'services.sso.lastLogin': new Date(),
-        'profile.subscriptions': subscriptions
+        subscriptions: subscriptions
       }
     });
   }

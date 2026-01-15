@@ -96,7 +96,7 @@ Meteor.methods({
     }
     
     return {
-      subscriptions: user.profile?.subscriptions || [],
+      subscriptions: user.subscriptions || [],
       hubUserId: user.services?.sso?.hubUserId
     };
   },
