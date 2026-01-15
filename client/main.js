@@ -1,6 +1,10 @@
 import m from 'mithril';
 import { Meteor } from 'meteor/meteor';
 import { Tracker } from 'meteor/tracker';
+import './main.html';
+
+// Import Pico CSS directly from node_modules
+import '@picocss/pico/css/pico.min.css';
 
 // Import pages
 import { MainLayout } from '../imports/ui/layouts/MainLayout.js';
@@ -57,12 +61,6 @@ function layoutRoute(component, attrs = {}) {
 function initializeApp() {
   // Create #app element if it doesn't exist
   let root = document.getElementById('app');
-  
-  if (!root) {
-    root = document.createElement('div');
-    root.id = 'app';
-    document.body.appendChild(root);
-  }
   
   // Set up routes
   m.route.prefix = '';
