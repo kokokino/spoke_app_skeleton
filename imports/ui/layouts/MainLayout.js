@@ -41,7 +41,9 @@ export const MainLayout = {
           'Powered by ',
           m('a', { href: hubUrl }, 'Kokokino'),
           ' • ',
-          m('a', { href: hubUrl }, 'Return to Hub')
+          m('a', { href: hubUrl }, 'Return to Hub'), 
+          ' • ',
+          m('a', { href: 'https://github.com/kokokino/spoke_app_skeleton', target: '_blank', rel: 'noopener' }, 'GitHub')
         ])
       ])
     ]);
