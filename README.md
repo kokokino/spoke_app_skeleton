@@ -79,6 +79,7 @@ We focus on simplicity as a super‑power:
 | **Mithril JS v2.3** | General UI, using JavaScript to craft HTML |
 | **Pico CSS** | Concise HTML that looks good with minimal effort |
 | **Babylon JS v8** | 3D rendering and physics (with Havok JS built‑in) |
+| **quave:migrations** | For managing changes to the database |
 
 You can choose a different tech stack but the more we converge on a similar stack, the easier it is to help each other. 
 
