@@ -1,21 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import jwt from 'jsonwebtoken';
 import { validateToken } from './client.js';
-
-// Cache for used nonces (in production, use Redis or MongoDB)
-const usedNonces = new Set();
-const NONCE_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
-
-// Clean up old nonces periodically
-if (Meteor.isServer) {
-  Meteor.setInterval(() => {
-    // In a real implementation, nonces would have timestamps
-    // For now, we just clear the set periodically
-    if (usedNonces.size > 10000) {
-      usedNonces.clear();
-    }
-  }, 5 * 60 * 1000); // Every 5 minutes
-}
+import { UsedNonces } from '../api/collections.js';
 
 /**
  * Validate an SSO token from the Hub
@@ -49,11 +35,12 @@ export async function validateSsoToken(token) {
     
     // Check nonce hasn't been used (prevent replay attacks)
     if (decoded.nonce) {
-      if (usedNonces.has(decoded.nonce)) {
+      const existingNonce = await UsedNonces.findOneAsync({ nonce: decoded.nonce });
+      if (existingNonce) {
         console.warn('Nonce already used:', decoded.nonce);
         return { valid: false, error: 'nonce_reused' };
       }
-      usedNonces.add(decoded.nonce);
+      await UsedNonces.insertAsync({ nonce: decoded.nonce, createdAt: new Date() });
     }
     
     // Optionally validate with Hub API for fresh data

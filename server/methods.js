@@ -1,40 +1,9 @@
 import { Meteor } from 'meteor/meteor';
-import { Random } from 'meteor/random';
 import { check, Match } from 'meteor/check';
 import { checkSubscription } from '../imports/hub/subscriptions.js';
+import { ChatMessages } from '../imports/api/collections.js';
 
-// In-memory chat message store
 const MAX_MESSAGES = 100;
-const messages = [];
-const subscribers = new Map();
-let subscriberIdCounter = 0;
-
-export const chatMessageStore = {
-  getMessages() {
-    return [...messages];
-  },
-  
-  addMessage(message) {
-    messages.push(message);
-    if (messages.length > MAX_MESSAGES) {
-      messages.shift();
-    }
-    // Notify all subscribers
-    subscribers.forEach(sub => {
-      sub.added(message);
-    });
-  },
-  
-  addSubscriber(callbacks) {
-    const id = ++subscriberIdCounter;
-    subscribers.set(id, callbacks);
-    return id;
-  },
-  
-  removeSubscriber(id) {
-    subscribers.delete(id);
-  }
-};
 
 Meteor.methods({
   // Send a chat message
@@ -72,16 +41,26 @@ Meteor.methods({
     }
     
     const message = {
-      _id: Random.id(),
       text: trimmedText,
       userId: this.userId,
       username: user.username || 'Anonymous',
       createdAt: new Date()
     };
-    
-    chatMessageStore.addMessage(message);
-    
-    return message._id;
+
+    const messageId = await ChatMessages.insertAsync(message);
+
+    // Clean up old messages to keep collection capped at MAX_MESSAGES
+    const count = await ChatMessages.countDocuments();
+    if (count > MAX_MESSAGES) {
+      const oldMessages = await ChatMessages.find(
+        {},
+        { sort: { createdAt: 1 }, limit: count - MAX_MESSAGES, fields: { _id: 1 } }
+      ).fetchAsync();
+      const idsToDelete = oldMessages.map(m => m._id);
+      await ChatMessages.removeAsync({ _id: { $in: idsToDelete } });
+    }
+
+    return messageId;
   },
   
   // Get current user's subscription status

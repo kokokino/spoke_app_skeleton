@@ -1,34 +1,14 @@
 import { Meteor } from 'meteor/meteor';
-import { chatMessageStore } from './methods.js';
+import { ChatMessages } from '../imports/api/collections.js';
 
-// Publish chat messages using a custom publication
-// Messages are stored in-memory on the server, not in MongoDB
+// Publish chat messages from MongoDB
+// Meteor's oplog tailing handles real-time updates automatically
 Meteor.publish('chatMessages', function() {
-  const sub = this;
-  
   if (!this.userId) {
-    sub.ready();
-    return;
+    return this.ready();
   }
-  
-  // Send existing messages
-  const messages = chatMessageStore.getMessages();
-  messages.forEach(msg => {
-    sub.added('chatMessages', msg._id, msg);
-  });
-  
-  // Register this subscription for live updates
-  const subscriberId = chatMessageStore.addSubscriber({
-    added(msg) {
-      sub.added('chatMessages', msg._id, msg);
-    }
-  });
-  
-  sub.ready();
-  
-  sub.onStop(() => {
-    chatMessageStore.removeSubscriber(subscriberId);
-  });
+
+  return ChatMessages.find({}, { sort: { createdAt: -1 }, limit: 100 });
 });
 
 // Publish current user's subscription data

@@ -4,6 +4,8 @@ import { Meteor } from 'meteor/meteor';
 import './accounts.js';
 import './publications.js';
 import './methods.js';
+import './indexes.js';
+import './rateLimiting.js';
 
 Meteor.startup(async () => {
   console.log('Spoke App Skeleton started');

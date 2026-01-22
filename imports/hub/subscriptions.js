@@ -1,8 +1,8 @@
 import { Meteor } from 'meteor/meteor';
 import { checkSubscriptionWithHub } from './client.js';
+import { SubscriptionCache } from '../api/collections.js';
 
-// Cache subscription checks for a short period
-const subscriptionCache = new Map();
+// Cache TTL in milliseconds (must match TTL index in server/indexes.js)
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
@@ -75,15 +75,15 @@ function checkLocalSubscriptions(subscriptions, requiredProductIds) {
 async function refreshSubscriptionFromHub(meteorUserId, hubUserId, requiredProductIds) {
   // Check cache first
   const cacheKey = `${hubUserId}:${requiredProductIds.join(',')}`;
-  const cached = subscriptionCache.get(cacheKey);
-  
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+  const cached = await SubscriptionCache.findOneAsync({ _id: cacheKey });
+
+  if (cached && Date.now() - cached.createdAt.getTime() < CACHE_TTL_MS) {
     return cached.data;
   }
-  
+
   // Call Hub API
   const result = await checkSubscriptionWithHub(hubUserId, requiredProductIds);
-  
+
   // Update local user data
   if (result.subscriptions) {
     await Meteor.users.updateAsync(meteorUserId, {
@@ -92,25 +92,22 @@ async function refreshSubscriptionFromHub(meteorUserId, hubUserId, requiredProdu
       }
     });
   }
-  
-  // Cache the result
-  subscriptionCache.set(cacheKey, {
-    timestamp: Date.now(),
-    data: result
-  });
-  
+
+  // Cache the result (upsert to handle both insert and update)
+  await SubscriptionCache.upsertAsync(
+    { _id: cacheKey },
+    { $set: { data: result, createdAt: new Date() } }
+  );
+
   return result;
 }
 
 /**
  * Clear subscription cache for a user
  */
-export function clearSubscriptionCache(hubUserId) {
-  for (const key of subscriptionCache.keys()) {
-    if (key.startsWith(hubUserId + ':')) {
-      subscriptionCache.delete(key);
-    }
-  }
+export async function clearSubscriptionCache(hubUserId) {
+  // Remove all cache entries that start with the hubUserId
+  await SubscriptionCache.removeAsync({ _id: { $regex: `^${hubUserId}:` } });
 }
 
 /**
