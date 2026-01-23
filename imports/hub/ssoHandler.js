@@ -34,13 +34,22 @@ export async function validateSsoToken(token) {
     }
     
     // Check nonce hasn't been used (prevent replay attacks)
+    // Uses MongoDB with TTL index - atomic insert ensures only one instance can use each nonce
     if (decoded.nonce) {
-      const existingNonce = await UsedNonces.findOneAsync({ nonce: decoded.nonce });
-      if (existingNonce) {
-        console.warn('Nonce already used:', decoded.nonce);
-        return { valid: false, error: 'nonce_reused' };
+      try {
+        await UsedNonces.insertAsync({
+          _id: decoded.nonce,
+          createdAt: new Date()
+        });
+      } catch (error) {
+        // Duplicate key error means nonce was already used
+        if (error.code === 11000 || error.message?.includes('duplicate key')) {
+          console.warn('Nonce already used:', decoded.nonce);
+          return { valid: false, error: 'nonce_reused' };
+        }
+        // Other errors - log but don't block (fail open for availability)
+        console.error('Error recording nonce:', error.message);
       }
-      await UsedNonces.insertAsync({ nonce: decoded.nonce, createdAt: new Date() });
     }
     
     // Optionally validate with Hub API for fresh data

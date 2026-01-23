@@ -6,6 +6,7 @@ import './publications.js';
 import './methods.js';
 import './indexes.js';
 import './rateLimiting.js';
+import './migrations/0_steps.js';
 
 Meteor.startup(async () => {
   console.log('Spoke App Skeleton started');

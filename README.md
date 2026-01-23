@@ -123,6 +123,8 @@ You can choose a different tech stack but the more we converge on a similar stac
    meteor --settings settings.development.json --port 3010
    ```
 
+   Migrations run automatically on startup. You should see "Created UsedNonces TTL index" in the logs on first run.
+
 ### Running with Local Hub
 
 For local development with the Hub:
