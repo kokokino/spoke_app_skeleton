@@ -39,8 +39,9 @@ coverage/
 # client/compatibility/
 # packages/
 
-# Aider
+# AI tools
 .aider*
+.claude/
 
 # Private keys (NEVER commit these)
 *.pem
