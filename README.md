@@ -1,6 +1,6 @@
 # Spoke App Skeleton
 
-A template for creating new spoke apps and a reference implementation of Hub integration for the Kokokino ecosystem.
+A template for creating new spoke apps and a reference implementation of Hub integration for the [Kokokino](https://www.kokokino.com) ecosystem.
 
 ## Overview
 
@@ -306,6 +306,7 @@ We welcome contributions! Please see our [Contributing Guidelines](documentation
 
 ## Related Resources
 
+- [Kokokino](https://www.kokokino.com) – Main platform website
 - [Kokokino Hub](https://github.com/kokokino/hub) – Central authentication and billing app
 - [Hub & Spoke Strategy](documentation/HUB_SPOKE_STRATEGY.md) – Architecture documentation
 - [Conventions](documentation/CONVENTIONS.md) – Coding advice
