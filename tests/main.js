@@ -2,11 +2,9 @@ import assert from "assert";
 import { Meteor } from "meteor/meteor";
 import { Random } from "meteor/random";
 
-// Import modules to test
+// Import server modules to ensure methods are registered
 if (Meteor.isServer) {
-  import { validateSsoToken } from "../imports/hub/ssoHandler.js";
-  import { checkSubscription } from "../imports/hub/subscriptions.js";
-  import { chatMessageStore } from "../server/methods.js";
+  require("../server/methods.js");
 }
 
 describe("spoke_app_skeleton", function () {
@@ -72,13 +70,13 @@ describe("spoke_app_skeleton", function () {
         assert.strictEqual(result, true);
       });
 
-      it("grants access when requiredProductIds is null", async function () {
+      it("grants access when requiredProductSlugs is null", async function () {
         const { checkSubscription } = await import("../imports/hub/subscriptions.js");
         const result = await checkSubscription("fake-user-id", null);
         assert.strictEqual(result, true);
       });
 
-      it("grants access when requiredProductIds is undefined", async function () {
+      it("grants access when requiredProductSlugs is undefined", async function () {
         const { checkSubscription } = await import("../imports/hub/subscriptions.js");
         const result = await checkSubscription("fake-user-id", undefined);
         assert.strictEqual(result, true);
@@ -91,117 +89,125 @@ describe("spoke_app_skeleton", function () {
       });
     });
 
-    describe("Chat Message Store", function () {
-      it("starts with empty messages", async function () {
-        const { chatMessageStore } = await import("../server/methods.js");
-        // Note: This test may fail if other tests have added messages
-        // In a real test suite, you'd want to reset state between tests
-        const messages = chatMessageStore.getMessages();
-        assert.ok(Array.isArray(messages));
+    describe("Chat Messages Collection", function () {
+      let ChatMessages;
+
+      before(async function () {
+        const collections = await import("../imports/api/collections.js");
+        ChatMessages = collections.ChatMessages;
       });
 
-      it("adds a message correctly", async function () {
-        const { chatMessageStore } = await import("../server/methods.js");
-        const initialCount = chatMessageStore.getMessages().length;
-        
+      beforeEach(async function () {
+        // Clean up test messages before each test
+        await ChatMessages.removeAsync({ userId: "test-user-collection" });
+      });
+
+      after(async function () {
+        // Final cleanup
+        await ChatMessages.removeAsync({ userId: "test-user-collection" });
+      });
+
+      it("can insert and retrieve messages", async function () {
         const testMessage = {
-          _id: Random.id(),
           text: "Test message",
-          userId: "test-user",
+          userId: "test-user-collection",
           username: "TestUser",
           createdAt: new Date()
         };
-        
-        chatMessageStore.addMessage(testMessage);
-        
-        const messages = chatMessageStore.getMessages();
-        assert.strictEqual(messages.length, initialCount + 1);
-        
-        const lastMessage = messages[messages.length - 1];
-        assert.strictEqual(lastMessage._id, testMessage._id);
-        assert.strictEqual(lastMessage.text, "Test message");
-        assert.strictEqual(lastMessage.username, "TestUser");
+
+        const messageId = await ChatMessages.insertAsync(testMessage);
+        assert.ok(messageId, "Should return an ID after insert");
+
+        const retrieved = await ChatMessages.findOneAsync(messageId);
+        assert.ok(retrieved, "Should be able to retrieve the message");
+        assert.strictEqual(retrieved.text, "Test message");
+        assert.strictEqual(retrieved.username, "TestUser");
       });
 
-      it("limits messages to MAX_MESSAGES", async function () {
-        const { chatMessageStore } = await import("../server/methods.js");
-        
-        // Add 150 messages (more than MAX_MESSAGES which is 100)
-        for (let i = 0; i < 150; i++) {
-          chatMessageStore.addMessage({
-            _id: Random.id(),
-            text: `Message ${i}`,
-            userId: "test-user",
-            username: "TestUser",
-            createdAt: new Date()
-          });
-        }
-        
-        const messages = chatMessageStore.getMessages();
-        assert.ok(messages.length <= 100, `Expected <= 100 messages, got ${messages.length}`);
-      });
-
-      it("notifies subscribers when message added", async function () {
-        const { chatMessageStore } = await import("../server/methods.js");
-        
-        let notifiedMessage = null;
-        const subscriberId = chatMessageStore.addSubscriber({
-          added(msg) {
-            notifiedMessage = msg;
-          }
-        });
-        
+      it("stores messages with correct fields", async function () {
+        const now = new Date();
         const testMessage = {
-          _id: Random.id(),
-          text: "Subscriber test message",
-          userId: "test-user",
-          username: "TestUser",
-          createdAt: new Date()
+          text: "Field test message",
+          userId: "test-user-collection",
+          username: "FieldTestUser",
+          createdAt: now
         };
-        
-        chatMessageStore.addMessage(testMessage);
-        
-        assert.ok(notifiedMessage, "Subscriber should have been notified");
-        assert.strictEqual(notifiedMessage._id, testMessage._id);
-        
-        // Clean up
-        chatMessageStore.removeSubscriber(subscriberId);
+
+        const messageId = await ChatMessages.insertAsync(testMessage);
+        const retrieved = await ChatMessages.findOneAsync(messageId);
+
+        assert.strictEqual(retrieved.text, "Field test message");
+        assert.strictEqual(retrieved.userId, "test-user-collection");
+        assert.strictEqual(retrieved.username, "FieldTestUser");
+        assert.ok(retrieved.createdAt instanceof Date);
       });
 
-      it("removes subscriber correctly", async function () {
-        const { chatMessageStore } = await import("../server/methods.js");
-        
-        let callCount = 0;
-        const subscriberId = chatMessageStore.addSubscriber({
-          added(msg) {
-            callCount++;
-          }
-        });
-        
-        // Add a message - should notify
-        chatMessageStore.addMessage({
-          _id: Random.id(),
-          text: "First message",
-          userId: "test-user",
-          username: "TestUser",
+      it("can query messages by userId", async function () {
+        // Insert messages for different users
+        await ChatMessages.insertAsync({
+          text: "User A message",
+          userId: "test-user-collection",
+          username: "UserA",
           createdAt: new Date()
         });
-        
-        assert.strictEqual(callCount, 1);
-        
-        // Remove subscriber
-        chatMessageStore.removeSubscriber(subscriberId);
-        
-        // Add another message - should NOT notify
-        chatMessageStore.addMessage({
-          _id: Random.id(),
+
+        await ChatMessages.insertAsync({
+          text: "User B message",
+          userId: "other-user",
+          username: "UserB",
+          createdAt: new Date()
+        });
+
+        const userAMessages = await ChatMessages.find({ userId: "test-user-collection" }).fetchAsync();
+        assert.strictEqual(userAMessages.length, 1);
+        assert.strictEqual(userAMessages[0].text, "User A message");
+
+        // Cleanup the other user's message
+        await ChatMessages.removeAsync({ userId: "other-user" });
+      });
+
+      it("can sort messages by createdAt", async function () {
+        const now = new Date();
+
+        await ChatMessages.insertAsync({
           text: "Second message",
-          userId: "test-user",
+          userId: "test-user-collection",
+          username: "TestUser",
+          createdAt: new Date(now.getTime() + 1000)
+        });
+
+        await ChatMessages.insertAsync({
+          text: "First message",
+          userId: "test-user-collection",
+          username: "TestUser",
+          createdAt: now
+        });
+
+        const messages = await ChatMessages.find(
+          { userId: "test-user-collection" },
+          { sort: { createdAt: 1 } }
+        ).fetchAsync();
+
+        assert.strictEqual(messages.length, 2);
+        assert.strictEqual(messages[0].text, "First message");
+        assert.strictEqual(messages[1].text, "Second message");
+      });
+
+      it("can delete messages", async function () {
+        const messageId = await ChatMessages.insertAsync({
+          text: "To be deleted",
+          userId: "test-user-collection",
           username: "TestUser",
           createdAt: new Date()
         });
-        
-        assert.strictEqual(callCount, 1, "Removed subscriber should not be notified");
+
+        let message = await ChatMessages.findOneAsync(messageId);
+        assert.ok(message, "Message should exist before deletion");
+
+        await ChatMessages.removeAsync(messageId);
+
+        message = await ChatMessages.findOneAsync(messageId);
+        assert.strictEqual(message, undefined, "Message should not exist after deletion");
       });
     });
 
