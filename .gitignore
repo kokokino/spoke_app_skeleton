@@ -44,3 +44,9 @@ coverage/
 # Private keys (NEVER commit these)
 *.pem
 !public.pem
+
+# Meteor Modern-Tools build context directories
+_build
+*/build-assets
+*/build-chunks
+.rsdoctor
