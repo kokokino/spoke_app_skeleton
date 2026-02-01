@@ -16,12 +16,15 @@ We focus on simplicity as a super‑power:
 | Technology | Purpose |
 |------------|---------|
 | **JavaScript** | Unified language for both server‑side and browser‑side code |
-| **Meteor JS v3** | Realtime apps, user accounts, and MongoDB integration |
+| **Node.js 22.x** | Server runtime (required for Meteor 3.4) |
+| **Meteor JS v3.4** | Realtime apps, user accounts, and MongoDB integration |
+| **RSpack** | Fast module bundler (replaces Webpack in Meteor 3.4) |
 | **Meteor Galaxy** | To deploy our apps in the cloud |
 | **Mithril JS v2.3** | General UI, using JavaScript to craft HTML |
 | **Pico CSS** | Concise HTML that looks good with minimal effort |
 | **Babylon JS v8** | 3D rendering and physics (with Havok JS built‑in) |
 | **Lemon Squeezy** | Billing and subscription management |
+| **quave:migrations** | Database schema migrations |
 
 ## The Hub App
 The **Hub** is the central application users see when visiting `http://kokokino.com`.  
@@ -74,4 +77,4 @@ Check the individual app repositories for contribution guidelines and issue trac
 7. Give every variable a readable word name like "document" and avoid acronyms like "doc" - The only exception is simple counters where a variable like "i" can be acceptable but even then "count" is preferred. 
 
 ---
-*Last updated: 2026‑01‑18*
+*Last updated: 2026‑01‑31*

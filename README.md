@@ -20,7 +20,7 @@ This app follows the Kokokino Hub & Spoke architecture:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         KOKOKINO HUB                           │
-│                    (kokokino.com:3000)                          │
+│                        (kokokino.com)                           │
 │  • User accounts    • Billing    • SSO tokens    • Spoke API   │
 └─────────────────────────────────────────────────────────────────┘
                                     │
@@ -48,7 +48,7 @@ This app follows the Kokokino Hub & Spoke architecture:
 
 ### 3. Demo Chat Room
 - Real-time messaging using Meteor publications and methods
-- In-memory message store (not persisted between server restarts)
+- Messages stored in MongoDB (capped at 100 messages)
 - User presence and typing indicators (future enhancement)
 
 ### 4. Authentication Pages
@@ -64,8 +64,8 @@ This app follows the Kokokino Hub & Spoke architecture:
 ## Getting Started
 
 ### Prerequisites
-- Meteor 3+
-- Node.js 20+
+- Meteor 3.4+
+- Node.js 22.x
 - Access to a running Kokokino Hub instance (local or production)
 
 ## Preferred Tech Stack
@@ -74,7 +74,7 @@ We focus on simplicity as a super‑power:
 | Technology | Purpose |
 |------------|---------|
 | **JavaScript** | Unified language for both server‑side and browser‑side code |
-| **Meteor JS v3** | Realtime apps, user accounts, and MongoDB integration |
+| **Meteor JS v3.4** | Realtime apps, user accounts, and MongoDB integration |
 | **Meteor Galaxy** | To deploy our apps in the cloud |
 | **Mithril JS v2.3** | General UI, using JavaScript to craft HTML |
 | **Pico CSS** | Concise HTML that looks good with minimal effort |
@@ -182,7 +182,9 @@ spoke_app_skeleton/
 │   ├── main.js            # Server entry point
 │   ├── accounts.js        # Custom login handlers
 │   ├── methods.js         # Meteor methods
-│   └── publications.js    # Data publications
+│   ├── publications.js    # Data publications
+│   ├── indexes.js         # Database indexes (TTL for nonces/cache)
+│   └── rateLimiting.js    # DDP rate limiter configuration
 ├── tests/                 # Test files
 ├── settings.example.json  # Example configuration
 └── package.json           # Dependencies
@@ -212,9 +214,9 @@ Higher-order component that:
 
 ### Chat Implementation
 Demonstrates Meteor's real-time capabilities:
-- **Server-side**: In-memory message store with publication
+- **Server-side**: MongoDB-backed message store with publication (auto-caps at 100 messages)
 - **Client-side**: Reactive subscription with Mithril components
-- **Methods**: Secure message sending with user validation
+- **Methods**: Secure message sending with user validation and rate limiting
 
 ## Creating Your Own Spoke App
 

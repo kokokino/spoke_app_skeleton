@@ -9,7 +9,7 @@ This document outlines the strategy for extending Kokokino's Hub app to support 
 - Spoke apps may be maintained by community members with varying trust levels
 - Security must assume spoke maintainers could be malicious or careless
 - Each spoke scales independently and can fail without affecting other apps
-- Consistent tech stack (Meteor, Mithril, Pico CSS) enables community collaboration
+- Consistent tech stack (Meteor 3.4+, Node.js 22.x, Mithril, Pico CSS) enables community collaboration
 
 ---
 
@@ -42,7 +42,7 @@ This document outlines the strategy for extending Kokokino's Hub app to support 
 │                           │       │                           │
 │   • Validates SSO tokens  │       │   • Game collection mgmt  │
 │   • Checks subscriptions  │       │   • Darkadia CSV import   │
-│   • Demo chat feature     │       │   • 3D bookshelf view     │
+│   • Demo chat feature     │       │   • 3D beanstalk view     │
 │                           │       │   • Open source game DB   │
 │   Own MongoDB instance    │       │   Own MongoDB instance    │
 └───────────────────────────┘       └───────────────────────────┘
@@ -373,8 +373,11 @@ spoke_app_name/
 │       └── [app-specific]
 ├── server/
 │   ├── main.js
+│   ├── accounts.js         # Custom SSO login handler
 │   ├── publications.js
-│   └── methods.js
+│   ├── methods.js
+│   ├── indexes.js          # Database indexes (TTL for cleanup)
+│   └── rateLimiting.js     # DDP rate limiter
 ├── public/
 │   └── [static assets]
 ├── private/
@@ -445,7 +448,7 @@ The Spoke App Skeleton serves as:
 
 3. **Demo Chat Room**
    - Real-time messaging using Meteor publications
-   - Messages are NOT persisted (in-memory only)
+   - Messages stored in MongoDB (capped at 100 messages)
    - Demonstrates Meteor's reactivity without polling
    - Shows pattern for user presence
 
@@ -462,62 +465,54 @@ The Spoke App Skeleton serves as:
 ### Chat Implementation Details
 
 ```javascript
-// Server-side in-memory message store
-const chatMessages = [];
+// MongoDB-backed message store with automatic cleanup
 const MAX_MESSAGES = 100;
-const subscribers = new Set();
 
-// When a message is added, notify all subscribers
-function addMessage(message) {
-  chatMessages.push(message);
-  if (chatMessages.length > MAX_MESSAGES) {
-    chatMessages.shift(); // Remove oldest
-  }
-  // Notify all publication subscribers
-  subscribers.forEach(sub => {
-    sub.added('chatMessages', message._id, message);
-  });
-}
-
-// Publication sends current messages and listens for new ones
+// Publication uses standard MongoDB cursor (reactive via oplog)
 Meteor.publish('chatMessages', function() {
-  const sub = this;
-  
-  // Send existing messages
-  chatMessages.forEach(msg => {
-    sub.added('chatMessages', msg._id, msg);
-  });
-  
-  // Track this subscriber
-  subscribers.add(sub);
-  
-  sub.ready();
-  
-  sub.onStop(() => {
-    subscribers.delete(sub);
+  if (!this.userId) {
+    return this.ready();
+  }
+  return ChatMessages.find({}, {
+    sort: { createdAt: -1 },
+    limit: MAX_MESSAGES
   });
 });
 
-// Method to send a message
+// Method to send a message (Meteor v3 async/await pattern)
 Meteor.methods({
-  'chat.send'(text) {
-    // Validate user is logged in and has subscription
-    if (!this.userId) throw new Meteor.Error('not-authorized');
-    
-    // Get user info from local session
-    const user = Meteor.users.findOne(this.userId);
-    
+  async 'chat.send'(text) {
+    check(text, String);
+
+    if (!this.userId) {
+      throw new Meteor.Error('not-authorized');
+    }
+
+    const user = await Meteor.users.findOneAsync(this.userId);
+    const trimmedText = text.trim().substring(0, 500);
+
     const message = {
-      _id: Random.id(),
-      text: text.substring(0, 500), // Limit length
+      text: trimmedText,
       userId: this.userId,
       username: user.username,
       createdAt: new Date()
     };
-    
-    addMessage(message);
-    
-    return message._id;
+
+    const messageId = await ChatMessages.insertAsync(message);
+
+    // Clean up old messages to keep collection capped
+    const count = await ChatMessages.countDocuments();
+    if (count > MAX_MESSAGES) {
+      const oldMessages = await ChatMessages.find(
+        {},
+        { sort: { createdAt: 1 }, limit: count - MAX_MESSAGES }
+      ).fetchAsync();
+      await ChatMessages.removeAsync({
+        _id: { $in: oldMessages.map(m => m._id) }
+      });
+    }
+
+    return messageId;
   }
 });
 ```
@@ -652,8 +647,8 @@ hub/
    - `SessionExpired.js` - Link to Hub
 
 7. **Implement Demo Chat**
-   - In-memory message store
-   - Real-time publication
+   - MongoDB message store (capped at 100 messages)
+   - Real-time publication via oplog tailing
    - Simple chat UI component
 
 8. **Create Main Layout**
@@ -705,9 +700,11 @@ spoke_app_skeleton/
 │       └── chatMessages.js
 ├── server/
 │   ├── main.js
+│   ├── accounts.js
 │   ├── publications.js
 │   ├── methods.js
-│   └── accounts.js
+│   ├── indexes.js
+│   └── rateLimiting.js
 ├── .gitignore
 ├── package.json
 ├── settings.example.json
@@ -937,5 +934,5 @@ Future feature for community-contributed spokes:
 
 ---
 
-*Last updated: 2025-01-18*
-*Document version: 1.0*
+*Last updated: 2026-01-31*
+*Document version: 1.1*

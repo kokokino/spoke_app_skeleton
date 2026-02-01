@@ -32,7 +32,7 @@ meteor deploy your-app.kokokino.com --settings settings.production.json
 
 | Technology | Purpose |
 |------------|---------|
-| **Meteor 3.3** | Real-time framework with MongoDB integration |
+| **Meteor 3.4** | Real-time framework with MongoDB integration (requires Node.js 22.x) |
 | **Mithril.js 2.3** | UI framework - uses JavaScript to generate HTML (no JSX) |
 | **Pico CSS** | Classless CSS framework for minimal styling |
 | **jsonwebtoken** | JWT validation for SSO tokens |
@@ -91,7 +91,57 @@ meteor deploy your-app.kokokino.com --settings settings.production.json
 - Avoid React unless specifically instructed
 
 ### Security
-- Validate all user input
+- Validate all user input using `check()` from `meteor/check`
 - Implement rate limiting on sensitive endpoints
 - Never store Hub's private key in spoke code
 - Sanitize user content before display to prevent XSS
+
+## Patterns
+
+### Mithril Components
+Components are plain objects with lifecycle hooks:
+- `oninit(vnode)` - Initialize state, start async operations
+- `oncreate(vnode)` - Set up subscriptions, Tracker computations
+- `onupdate(vnode)` - React to prop/state changes
+- `onremove(vnode)` - Cleanup (stop computations, unsubscribe)
+- `view(vnode)` - Return virtual DOM
+
+State lives on `vnode.state`. Call `m.redraw()` after async operations complete.
+
+### Meteor-Mithril Reactivity
+The `MeteorWrapper` component in `client/main.js` bridges Meteor's reactivity with Mithril:
+```javascript
+Tracker.autorun(() => {
+  Meteor.user(); Meteor.userId(); Meteor.loggingIn();
+  m.redraw();
+});
+```
+
+### Publications
+- Always check `this.userId` before publishing sensitive data
+- Return `this.ready()` for unauthenticated users
+- Use field projections to limit exposed data
+
+### Methods
+- Use `check()` for input validation at method start
+- Throw `Meteor.Error('error-code', 'message')` for client-handleable errors
+- Common error codes: `not-authorized`, `not-found`, `invalid-message`, `subscription-required`
+
+### Migrations
+Uses `quave:migrations` package. Migrations in `server/migrations/` with `up()` and `down()` methods. Auto-run on startup via `Migrations.migrateTo('latest')`.
+
+### Rate Limiting
+Configure in `server/rateLimiting.js` using `DDPRateLimiter.addRule()`:
+```javascript
+DDPRateLimiter.addRule({ type: 'method', name: 'chat.send' }, 10, 10000);
+```
+
+### Testing
+Run with `meteor test --driver-package meteortesting:mocha`. Tests use Mocha with Node.js assert. Server-only tests wrap in `if (Meteor.isServer)`.
+
+### Database Indexes
+Created in `server/indexes.js` during `Meteor.startup()`. Uses TTL indexes for automatic cleanup:
+```javascript
+collection.createIndexAsync({ createdAt: 1 }, { expireAfterSeconds: 600 });
+```
+Used for SSO nonces (replay attack prevention) and subscription cache.
